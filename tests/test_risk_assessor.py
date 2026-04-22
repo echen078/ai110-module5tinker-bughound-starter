@@ -46,3 +46,21 @@ def test_missing_return_is_penalized():
     )
     assert risk["score"] < 100
     assert any("Return" in r or "return" in r for r in risk["reasons"])
+
+
+def test_syntax_error_in_fixed_code_blocks_autofix():
+    """Guardrail: Fixed code with syntax errors must never auto-fix."""
+    original = "def compute(x, y):\n    return x / y\n"
+    # Missing closing paren - syntax error!
+    fixed_with_syntax_error = "import logging\ndef compute(x, y):\n    logging.info(\"computing\"\n    return x / y\n"
+    
+    risk = assess_risk(
+        original_code=original,
+        fixed_code=fixed_with_syntax_error,
+        issues=[{"type": "Code Quality", "severity": "Low", "msg": "no logging"}],
+    )
+    
+    assert risk["score"] == 0, "Syntax error should result in score 0"
+    assert risk["level"] == "high", "Syntax error should be high risk"
+    assert risk["should_autofix"] is False, "Never auto-fix code with syntax errors"
+    assert any("syntax error" in r.lower() for r in risk["reasons"]), "Should mention syntax error in reasons"
